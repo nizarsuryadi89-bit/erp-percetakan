@@ -2,13 +2,14 @@ import { Head, Link, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 import { ErpPage, field, panel } from '@/components/erp-page';
 import { ProductFields } from '@/components/product-fields';
+import { ProductQuoteSummary } from '@/components/product-quote-summary';
 import { Button } from '@/components/ui/button';
 import { index, update as updateProduct } from '@/routes/products';
 import {
     store as storePrice,
     update as updatePrice,
 } from '@/routes/product-prices';
-import { store as calculate } from '@/routes/product-quotes';
+import { store as calculate, show as showQuote } from '@/routes/product-quotes';
 import { pricingLabels, rupiah } from '@/types/product';
 import type {
     PriceQuote,
@@ -354,51 +355,10 @@ function Calculator({
                 className="flex flex-col justify-center rounded-lg bg-muted/50 p-5"
             >
                 {quote && showResult ? (
-                    <>
-                        <p className="text-sm text-muted-foreground">
-                            Hasil perhitungan · {quote.detail_product}
-                        </p>
-                        <p className="mt-3 text-3xl font-semibold">
-                            {rupiah(quote.subtotal)}
-                        </p>
-                        <dl className="mt-5 grid grid-cols-2 gap-3 text-sm">
-                            <dt>Jumlah pesanan</dt>
-                            <dd>{quote.qty}</dd>
-                            {quote.pricing_basis !== 'quantity' && (
-                                <>
-                                    <dt>Ukuran terhitung</dt>
-                                    <dd>
-                                        {quote.length}
-                                        {quote.pricing_basis === 'area'
-                                            ? ` × ${quote.width}`
-                                            : ''}{' '}
-                                        {quote.dimension_unit}
-                                    </dd>
-                                </>
-                            )}
-                            <dt>Jumlah ditagihkan</dt>
-                            <dd>
-                                {quote.billable_qty} {product.unit_name}
-                            </dd>
-                            <dt>Harga satuan</dt>
-                            <dd>{rupiah(quote.unit_price)}</dd>
-                            <dt>Spesifikasi</dt>
-                            <dd>
-                                {Object.values(quote.specifications)
-                                    .filter(Boolean)
-                                    .join(' · ') || 'Reguler'}
-                            </dd>
-                        </dl>
-                        {quote.minimum_applied && (
-                            <p className="mt-4 text-sm">
-                                Harga minimum {rupiah(quote.minimum_charge)}{' '}
-                                diterapkan.
-                            </p>
-                        )}
-                        <p className="mt-4 text-xs text-muted-foreground">
-                            Simulasi ini belum menyimpan transaksi atau SPK.
-                        </p>
-                    </>
+                    <div className="grid gap-4">
+                        <ProductQuoteSummary quote={quote} />
+                        <Link className="text-sm underline underline-offset-4" href={showQuote.url({ product: product.id, quote: quote.uuid })}>Buka hasil tersimpan</Link>
+                    </div>
                 ) : (
                     <p className="text-sm text-muted-foreground">
                         Pilih spesifikasi dan isi jumlah untuk melihat harga.
@@ -415,11 +375,13 @@ export default function ProductDetail({
     prices,
     canManage,
     quote,
+    savedQuotes,
 }: {
     product: Product;
     prices: ProductPrice[];
     canManage: boolean;
     quote: PriceQuote | null;
+    savedQuotes: { uuid: string; quoted_at: string; qty: string; subtotal: string }[];
 }) {
     const form = useForm<ProductData>({
         code: product.code,
@@ -453,6 +415,18 @@ export default function ProductDetail({
                     prices={prices}
                     quote={quote}
                 />
+                {savedQuotes.length > 0 && <section className={`${panel} grid gap-4`}>
+                    <h2 className="font-semibold">Perhitungan terbaru</h2>
+                    <p className="text-sm text-muted-foreground">Sepuluh hasil terakhir untuk produk ini. Perubahan harga master tidak mengubah hasil tersimpan.</p>
+                    <ul className="grid gap-3 sm:grid-cols-2">
+                        {savedQuotes.map((saved) => <li key={saved.uuid}>
+                            <Link className="flex min-h-11 flex-wrap items-center justify-between gap-2 rounded-lg border p-3 text-sm hover:bg-muted" href={showQuote.url({ product: product.id, quote: saved.uuid })}>
+                                <span>{new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(saved.quoted_at))} · Qty {saved.qty}</span>
+                                <span className="font-medium">{rupiah(saved.subtotal)}</span>
+                            </Link>
+                        </li>)}
+                    </ul>
+                </section>}
                 <section className={panel}>
                     <h2 className="mb-5 font-semibold">Matriks Harga</h2>
                     <div className="overflow-x-auto">

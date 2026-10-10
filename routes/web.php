@@ -4,8 +4,8 @@ use App\Http\Controllers\BranchController;
 use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ModuleController;
-use App\Http\Controllers\ProductController;
 use App\Http\Controllers\PlatformController;
+use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProductPriceController;
 use App\Http\Controllers\ProductQuoteController;
 use App\Http\Controllers\TenantSwitchController;
@@ -44,6 +44,7 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
             Route::post('/transaksi/produk/{product}/harga', [ProductPriceController::class, 'store'])->name('product-prices.store');
             Route::patch('/transaksi/produk/{product}/harga/{price}', [ProductPriceController::class, 'update'])->name('product-prices.update');
             Route::post('/transaksi/produk/{product}/hitung', [ProductQuoteController::class, 'store'])->middleware('throttle:60,1')->name('product-quotes.store');
+            Route::get('/transaksi/produk/{product}/simulasi/{quote}', [ProductQuoteController::class, 'show'])->whereUuid('quote')->name('product-quotes.show');
         });
         Route::get('/modul/{module:code}', [WorkspaceController::class, 'module'])->middleware('module')->name('module-workspace.show');
         foreach (array_keys(config('erp.modules')) as $code) {

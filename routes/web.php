@@ -1,10 +1,14 @@
 <?php
 
 use App\Http\Controllers\BranchController;
+use App\Http\Controllers\BranchMembershipController;
 use App\Http\Controllers\CompanyController;
+use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ModuleController;
 use App\Http\Controllers\PlatformController;
+use App\Http\Controllers\PrintOrderController;
+use App\Http\Controllers\PrintOrderItemController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProductPriceController;
 use App\Http\Controllers\ProductQuoteController;
@@ -30,6 +34,7 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
         Route::get('/pengaturan/cabang', [BranchController::class, 'index'])->name('branches.index');
         Route::post('/pengaturan/cabang', [BranchController::class, 'store'])->name('branches.store');
         Route::patch('/pengaturan/cabang/{branch}', [BranchController::class, 'update'])->name('branches.update');
+        Route::patch('/pengaturan/cabang/{branch}/anggota', [BranchMembershipController::class, 'update'])->middleware('deskprint')->name('branch-memberships.update');
         Route::post('/cabang/beralih', [BranchController::class, 'switch'])->name('branches.switch');
         Route::get('/pengaturan/pengguna', [TenantUserController::class, 'index'])->name('tenant-users.index');
         Route::post('/pengaturan/pengguna', [TenantUserController::class, 'store'])->name('tenant-users.store');
@@ -37,6 +42,21 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
         Route::get('/pengaturan/modul', [ModuleController::class, 'index'])->name('modules.index');
         Route::patch('/pengaturan/modul/{code}', [ModuleController::class, 'update'])->name('modules.update');
         Route::middleware('module:transaksi')->group(function (): void {
+            Route::middleware('deskprint')->group(function (): void {
+                Route::get('/transaksi/pelanggan', [CustomerController::class, 'index'])->name('customers.index');
+                Route::post('/transaksi/pelanggan', [CustomerController::class, 'store'])->middleware('throttle:60,1')->name('customers.store');
+                Route::get('/transaksi/spk', [PrintOrderController::class, 'index'])->name('print-orders.index');
+                Route::get('/transaksi/spk/buat', [PrintOrderController::class, 'create'])->name('print-orders.create');
+                Route::post('/transaksi/spk', [PrintOrderController::class, 'store'])->middleware('throttle:60,1')->name('print-orders.store');
+                Route::get('/transaksi/spk/{order}', [PrintOrderController::class, 'show'])->name('print-orders.show');
+                Route::get('/transaksi/spk/{order}/cetak', [PrintOrderController::class, 'print'])->name('print-orders.print');
+                Route::patch('/transaksi/spk/{order}/status', [PrintOrderController::class, 'status'])->name('print-orders.status');
+                Route::get('/transaksi/spk/{order}/produk', [PrintOrderItemController::class, 'catalog'])->name('print-order-items.catalog');
+                Route::post('/transaksi/spk/{order}/preview', [PrintOrderItemController::class, 'preview'])->middleware('throttle:60,1')->name('print-order-items.preview');
+                Route::post('/transaksi/spk/{order}/item', [PrintOrderItemController::class, 'store'])->name('print-order-items.store');
+                Route::patch('/transaksi/spk/{order}/item/{item}', [PrintOrderItemController::class, 'update'])->name('print-order-items.update');
+                Route::delete('/transaksi/spk/{order}/item/{item}', [PrintOrderItemController::class, 'destroy'])->name('print-order-items.destroy');
+            });
             Route::get('/transaksi/produk', [ProductController::class, 'index'])->name('products.index');
             Route::post('/transaksi/produk', [ProductController::class, 'store'])->name('products.store');
             Route::get('/transaksi/produk/{product}', [ProductController::class, 'show'])->name('products.show');

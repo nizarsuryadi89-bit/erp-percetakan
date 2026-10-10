@@ -1,7 +1,7 @@
 import type { PriceQuote } from '@/types/product';
 import { rupiah } from '@/types/product';
 
-export function ProductQuoteSummary({ quote }: { quote: PriceQuote }) {
+export function ProductQuoteSummary({ quote, context = 'simulation' }: { quote: Omit<PriceQuote, 'uuid' | 'quoted_at'>; context?: 'simulation' | 'preview' | 'order' }) {
     return (
         <div className="grid gap-4">
             <p className="text-sm text-muted-foreground">Hasil perhitungan · {quote.detail_product}</p>
@@ -21,7 +21,7 @@ export function ProductQuoteSummary({ quote }: { quote: PriceQuote }) {
                 <dt>Spesifikasi</dt><dd className="break-words">{Object.values(quote.specifications).filter(Boolean).join(' · ') || 'Reguler'}</dd>
             </dl>
             {quote.minimum_applied && <p className="text-sm">Harga minimum {rupiah(quote.minimum_charge)} diterapkan.</p>}
-            <p className="text-xs leading-5 text-muted-foreground">Total dibulatkan ke rupiah terdekat. Hasil tersimpan mengikuti harga saat dihitung; hitung ulang untuk harga terkini. Simulasi ini belum menjadi transaksi atau SPK.</p>
+            <p className="text-xs leading-5 text-muted-foreground">Total dibulatkan ke rupiah terdekat. {context === 'order' ? 'Rincian mengikuti snapshot item saat disimpan.' : context === 'preview' ? 'Estimasi server. Harga dihitung ulang saat item disimpan.' : 'Hasil tersimpan mengikuti harga saat dihitung; hitung ulang untuk harga terkini. Simulasi ini belum menjadi transaksi atau SPK.'}</p>
         </div>
     );
 }

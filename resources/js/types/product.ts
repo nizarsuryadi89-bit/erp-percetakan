@@ -30,6 +30,7 @@ export type ProductPrice = {
 export type PriceQuote = {
     uuid: string;
     quoted_at: string;
+    unit_name: string;
     product_name: string;
     input_length: string;
     input_width: string;

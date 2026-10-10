@@ -1,10 +1,13 @@
 import { Head, router, useForm } from '@inertiajs/react';
 import { ErpPage, field, panel } from '@/components/erp-page';
 import { Button } from '@/components/ui/button';
+import { update as assignMembers } from '@/routes/branch-memberships';
 import { store, update } from '@/routes/branches';
 import type { Branch } from '@/types/erp';
 
-export default function Branches({ branches }: { branches: Branch[] }) {
+type Member = { id: number; name: string };
+type Assignment = { branch_id: number; user_id: number };
+export default function Branches({ branches, members, assignments, canAssign }: { branches: Branch[]; members: Member[]; assignments: Assignment[]; canAssign: boolean }) {
     const form = useForm({ code: '', name: '', address: '' });
     return (
         <>
@@ -79,6 +82,7 @@ export default function Branches({ branches }: { branches: Branch[] }) {
                         </tbody>
                     </table>
                 </section>
+                {canAssign && <section className="grid gap-4"><h2 className="font-semibold">Akses staf per cabang</h2><p className="text-sm text-muted-foreground">Staf hanya dapat mengakses SPK dan pelanggan pada cabang yang dicentang. Owner dan Administrator memiliki akses seluruh cabang aktif melalui hak kelola cabang.</p>{branches.map((branch) => <BranchMembers key={branch.id} branch={branch} members={members} selected={assignments.filter((row) => row.branch_id === branch.id).map((row) => row.user_id)} />)}</section>}
                 <form
                     className={`${panel} grid gap-4`}
                     onSubmit={(e) => {
@@ -138,4 +142,12 @@ export default function Branches({ branches }: { branches: Branch[] }) {
             </ErpPage>
         </>
     );
+}
+
+function BranchMembers({ branch, members, selected }: { branch: Branch; members: Member[]; selected: number[] }) {
+    const form = useForm({ user_ids: selected });
+    return <form className={`${panel} grid gap-3`} onSubmit={(event) => { event.preventDefault(); form.patch(assignMembers.url(branch.id), { preserveScroll: true }); }}>
+        <h3 className="font-medium">{branch.name}</h3><div className="grid gap-2 sm:grid-cols-2">{members.map((member) => <label key={member.id} className="flex min-h-11 items-center gap-3 rounded-lg border p-3 text-sm"><input type="checkbox" className="size-5" checked={form.data.user_ids.includes(member.id)} onChange={(event) => form.setData('user_ids', event.target.checked ? [...form.data.user_ids, member.id] : form.data.user_ids.filter((id) => id !== member.id))} />{member.name}</label>)}</div>
+        <Button className="min-h-11 justify-self-start" disabled={form.processing}>Simpan akses cabang</Button>
+    </form>;
 }

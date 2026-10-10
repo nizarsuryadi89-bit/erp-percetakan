@@ -1,5 +1,6 @@
 import { Head, Link } from '@inertiajs/react';
 import { ErpPage, panel } from '@/components/erp-page';
+import { index as cashierIndex } from '@/routes/invoices';
 import { index as ordersIndex } from '@/routes/print-orders';
 import { index as productIndex } from '@/routes/products';
 import type { ModuleDefinition } from '@/types/erp';
@@ -22,6 +23,7 @@ export default function ModuleWorkspace({
                             Buat pesanan multi-item, hitung harga otomatis, lalu konfirmasi dan cetak SPK dasar.
                         </p>
                         <Link className="mt-4 mr-3 inline-flex min-h-11 items-center rounded-md bg-primary px-4 text-sm text-primary-foreground" href={ordersIndex.url()}>Buka Deskprint & SPK</Link>
+                        <Link className="mt-4 mr-3 inline-flex min-h-11 items-center rounded-md bg-primary px-4 text-sm text-primary-foreground" href={cashierIndex.url()}>Buka kasir & invoice</Link>
                         <Link
                             className="mt-4 inline-flex rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground"
                             href={productIndex.url()}
@@ -50,7 +52,7 @@ export default function ModuleWorkspace({
                         ))}
                     </ol>
                     <p className="mt-5 max-w-3xl text-sm leading-6 text-muted-foreground">
-                        {code === 'POS' ? 'Pemesanan dan SPK dasar tersedia. Pembayaran, DP, piutang dan invoice final belum tersedia pada tahap ini.' : 'Halaman ini menyiapkan akses modul. Alur operasional akan ditambahkan sesuai tahap implementasi.'}
+                        {code === 'POS' ? 'Pemesanan, SPK, kasir, invoice dan pembayaran bertahap tersedia. Periksa sisa tagihan melalui daftar piutang.' : 'Halaman ini menyiapkan akses modul. Alur operasional akan ditambahkan sesuai tahap implementasi.'}
                     </p>
                 </section>
             </ErpPage>

@@ -67,3 +67,14 @@ Urutan implementasi setelah fondasi disetujui:
 6. Jalankan Lighthouse untuk audit web yang tersedia pada versi terpasang dan pemeriksaan manual installability/service worker; jangan mengandalkan satu skor sebagai bukti aman. Lanjutkan uji sentuh, keyboard, scanner dan printer fisik.
 
 Tidak ada hasil browser, Lighthouse, installability, hardware atau MySQL yang diklaim pada STEP 4. Persiapan ini menetapkan arah dan batas keamanan; penerapannya memerlukan tahap terpisah.
+
+
+## Pembaruan STEP 7 — 11 Oktober 2026
+
+Kasir/invoice kini tersedia dengan online-first, private/no-store pada respons sukses/error, history Inertia terenkripsi, dan guard HTTPS pada domain aplikasi (localhost/loopback HTTP sebagai secure-context development). Tidak ada transaksi/pembayaran yang disimpan untuk offline atau ditandai sukses sebelum respons server.
+
+Logout Fortify, tenant switch dan branch switch meminta clear history. Boundary app mengirim sinyal BroadcastChannel tanpa PII agar tab lain menghapus history dan menuju halaman publik; pageshow BFCache memicu pemeriksaan session lewat reload. Halaman lama di luar kasir belum semuanya mengenkripsi history. Ini belum menuntaskan seluruh audit privasi PWA pada bagian 4–6.
+
+Tes server membuktikan flag encryptHistory/clearHistory, HTTPS guard serta cache-control. Browser tidak dapat diakses karena request-header policy CUA gagal; WebCrypto/BroadcastChannel/lintas-tab/Back/Forward/storage tidak diklaim terverifikasi. Wajib uji browser target sebelum rollout. Kunci enkripsi Inertia memakai sessionStorage; data pelanggan/payment tidak disimpan plaintext di localStorage/Cache Storage/service worker.
+
+Manifest, installability, service worker, offline checkout dan printer otomatis tetap belum dibuat. Detail ledger, batas penerimaan dan migration pending ada pada [laporan STEP 7](../STEP7_KASIR_PEMBAYARAN.md).

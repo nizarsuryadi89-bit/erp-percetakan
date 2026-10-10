@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -74,6 +75,6 @@ class PrintOrderController extends Controller
     {
         $order->load(['items' => fn (HasMany $query) => $query->orderBy('id'), 'events' => fn (HasMany $query) => $query->orderByDesc('id')]);
 
-        return ['order' => $order, 'canManage' => $request->user()->can('spk.manage'), 'requestKey' => (string) Str::uuid(), 'timezone' => $order->company_snapshot['timezone']];
+        return ['order' => $order, 'invoiceId' => Schema::hasTable('invoices') ? $order->invoice()->value('id') : null, 'canIssue' => $request->user()->can('invoice.issue'), 'canManage' => $request->user()->can('spk.manage'), 'requestKey' => (string) Str::uuid(), 'timezone' => $order->company_snapshot['timezone']];
     }
 }

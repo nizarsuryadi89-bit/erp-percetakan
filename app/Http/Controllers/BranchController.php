@@ -48,6 +48,7 @@ class BranchController extends Controller
     {
         $data = $request->validate(['branch_id' => ['required', 'integer']]);
         $branch = $access->find($request->user(), (int) $data['branch_id']);
+        Inertia::clearHistory();
         $request->session()->put('branch_id', $branch->id);
 
         return to_route('dashboard')->with('success', 'Cabang aktif: '.$branch->name);

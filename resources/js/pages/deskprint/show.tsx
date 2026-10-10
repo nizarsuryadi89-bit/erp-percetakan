@@ -6,15 +6,16 @@ import { ProductQuoteSummary } from '@/components/product-quote-summary';
 import { Button } from '@/components/ui/button';
 import { useDeskprintSearch } from '@/hooks/use-deskprint-search';
 import { catalog, destroy, preview as previewRoute, store, update } from '@/routes/print-order-items';
+import { create as invoiceCreate, show as invoiceShow } from '@/routes/invoices';
 import { index, print as printRoute, status } from '@/routes/print-orders';
 import type { Calculation, CatalogProduct, OrderItem, PrintOrder } from '@/types/deskprint';
 import { dateInput, dateLabel, methodLabels, statusLabels } from '@/types/deskprint';
 import { rupiah } from '@/types/product';
-type Props = { order: PrintOrder; canManage: boolean; requestKey: string; timezone: string };
+type Props = { order: PrintOrder; canManage: boolean; requestKey: string; timezone: string; invoiceId: number | null; canIssue: boolean };
 const blank = { product_id: '', qty: '1', length: '', width: '', variant: '', machine: '', print_side: '', finishing: '', notes: '', process_location: '', deadline: '' };
 const eventLabels: Record<string, string> = { 'spk.dibuat': 'SPK dibuat', 'spk.item_ditambah': 'Item ditambahkan', 'spk.item_direvisi': 'Item direvisi', 'spk.item_dihapus': 'Item dikeluarkan dari draft', 'spk.status_diubah': 'Status diperbarui' };
 const specificationLabels = { variant: 'Bahan / varian', machine: 'Mesin', print_side: 'Sisi cetak', finishing: 'Finishing' };
-export default function OrderDetails({ order, canManage, requestKey, timezone }: Props) {
+export default function OrderDetails({ order, canManage, requestKey, timezone, invoiceId, canIssue }: Props) {
     const [step, setStep] = useState(0); const [search, setSearch] = useState('');
     const [product, setProduct] = useState<CatalogProduct | null>(null); const [editing, setEditing] = useState<OrderItem | null>(null);
     const [quote, setQuote] = useState<Calculation | null>(null); const [previewError, setPreviewError] = useState('');
@@ -54,6 +55,7 @@ export default function OrderDetails({ order, canManage, requestKey, timezone }:
     function changeStatus(value: string) { mutation.transform((data) => ({ ...data, status: value })); mutation.patch(status.url(order.id), { preserveScroll: true }); }
     return <><Head title={order.number} /><ErpPage title={order.number} description={`${methodLabels[order.method]} · ${order.company_snapshot.branch_name} · ${statusLabels[order.status]}`}>
         <DeskprintConnection />
+        {(invoiceId !== null || (canIssue && order.status === 'confirmed')) && <Link className="inline-flex min-h-11 items-center self-start rounded-lg border px-4" href={invoiceId !== null ? invoiceShow.url(invoiceId) : invoiceCreate.url(order.id)}>Tagihan / invoice di kasir</Link>}
         <div className="flex flex-wrap gap-3"><Link href={index.url()} className="inline-flex min-h-11 items-center underline">Daftar SPK</Link><Link href={printRoute.url(order.id)} className="inline-flex min-h-11 items-center rounded-lg border px-4">Lihat / cetak SPK</Link><Button variant="outline" className="min-h-11" disabled={busy} onClick={() => router.reload()}>Muat ulang data</Button></div>
         <section className={`${panel} grid gap-3 sm:grid-cols-2`}><div><h2 className="font-semibold">{order.customer_snapshot.name}</h2><p className="text-sm">{order.customer_snapshot.phone ?? 'Tanpa telepon'}</p><p className="text-sm text-muted-foreground">{order.customer_snapshot.address}</p></div><div className="text-sm"><p>Dibuat: {dateLabel(order.created_at, timezone)} · {order.creator_name}</p><p>Deadline: {dateLabel(order.deadline, timezone)} ({timezone})</p><p className="mt-2 whitespace-pre-wrap break-words">{order.notes}</p></div></section>
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-accent p-4"><p>{active.length} item · <strong>{rupiah(order.total)}</strong></p><Button type="button" variant="outline" className="min-h-11 xl:hidden" onClick={() => setStep(3)}>Review pesanan</Button></div>

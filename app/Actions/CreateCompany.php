@@ -14,7 +14,7 @@ use Spatie\Permission\PermissionRegistrar;
 
 class CreateCompany
 {
-    public function __construct(private TenantContext $context, private ProvisionTenantAccess $provision, private PermissionRegistrar $permissions, private ModuleRegistry $registry) {}
+    public function __construct(private TenantContext $context, private ProvisionTenantAccess $provision, private PermissionRegistrar $permissions, private ModuleRegistry $registry, private ConfigurePaymentMethods $paymentMethods) {}
 
     /** @param array{name: string, phone?: ?string, address?: ?string} $data */
     public function handle(User $owner, array $data): Tenant
@@ -30,6 +30,7 @@ class CreateCompany
                 $owner->unsetRelation('roles')->unsetRelation('permissions');
                 $tenant->users()->attach($owner, ['is_active' => true]);
                 $this->provision->handle($tenant);
+                $this->paymentMethods->handle();
                 $owner->assignRole('Owner');
                 Branch::create(['code' => 'UTAMA', 'name' => 'Cabang Utama', 'is_active' => true]);
                 License::create(['package_name' => config('erp.package_name'), 'price' => config('erp.license_price'), 'status' => 'pending']);

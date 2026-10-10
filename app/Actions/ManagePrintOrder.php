@@ -5,6 +5,7 @@ namespace App\Actions;
 use App\Models\AuditLog;
 use App\Models\Branch;
 use App\Models\Customer;
+use App\Models\Invoice;
 use App\Models\PrintOrder;
 use App\Models\PrintOrderEvent;
 use App\Models\PrintOrderItem;
@@ -14,6 +15,7 @@ use App\Support\DeskprintAccess;
 use App\Support\TenantContext;
 use Brick\Math\BigDecimal;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class ManagePrintOrder
@@ -101,6 +103,9 @@ class ManagePrintOrder
             }
             if ($target === 'cancelled' && trim($data['reason'] ?? '') === '') {
                 throw ValidationException::withMessages(['reason' => 'Alasan pembatalan wajib diisi.']);
+            }
+            if ($target === 'cancelled' && Schema::hasTable('invoices') && Invoice::where('print_order_id', $order->id)->where('status', 'issued')->exists()) {
+                throw ValidationException::withMessages(['status' => 'SPK memiliki invoice aktif. Pengelola harus menyelesaikan review dan void invoice terlebih dahulu.']);
             }
             $from = $order->status;
             $order->update(['status' => $target, 'version' => $order->version + 1]);

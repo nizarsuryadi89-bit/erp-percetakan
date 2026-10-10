@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnsureDeskprintReady;
 use App\Http\Middleware\EnsureModuleAccess;
 use App\Http\Middleware\EnsurePlatformAdministrator;
 use App\Http\Middleware\HandleAppearance;
@@ -20,11 +21,13 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
+            'deskprint' => EnsureDeskprintReady::class,
             'tenant' => ResolveTenant::class,
             'module' => EnsureModuleAccess::class,
             'platform' => EnsurePlatformAdministrator::class,
         ]);
-        $middleware->prependToPriorityList(SubstituteBindings::class, EnsureModuleAccess::class);
+        $middleware->prependToPriorityList(SubstituteBindings::class, EnsureDeskprintReady::class);
+        $middleware->prependToPriorityList(EnsureDeskprintReady::class, EnsureModuleAccess::class);
         $middleware->prependToPriorityList(EnsureModuleAccess::class, ResolveTenant::class);
         $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
 

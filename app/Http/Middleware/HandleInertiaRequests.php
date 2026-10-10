@@ -2,7 +2,7 @@
 
 namespace App\Http\Middleware;
 
-use App\Models\Branch;
+use App\Support\BranchAccess;
 use App\Support\ModuleAccess;
 use App\Support\TenantContext;
 use Illuminate\Http\Request;
@@ -12,7 +12,7 @@ class HandleInertiaRequests extends Middleware
 {
     protected $rootView = 'app';
 
-    public function __construct(private TenantContext $context, private ModuleAccess $access) {}
+    public function __construct(private TenantContext $context, private ModuleAccess $access, private BranchAccess $branches) {}
 
     /** @return array<string, mixed> */
     public function share(Request $request): array
@@ -33,7 +33,7 @@ class HandleInertiaRequests extends Middleware
         $user = $request->user();
         $tenant = $this->context->tenant();
         $companies = $user?->tenants()->wherePivot('is_active', true)->where('tenants.is_active', true)->orderBy('name')->get(['tenants.id', 'uuid', 'name']) ?? collect();
-        $branches = $tenant ? Branch::where('is_active', true)->orderBy('name')->get(['id', 'name', 'code']) : collect();
+        $branches = $tenant ? $this->branches->query($user)->orderBy('name')->get(['id', 'name', 'code']) : collect();
         $branchId = $request->session()->get('branch_id');
         if ($tenant && ! $branches->contains('id', $branchId)) {
             $branchId = $branches->first()?->id;

@@ -1,9 +1,16 @@
 <?php
 
+use App\Http\Middleware\EnsureModuleAccess;
+use App\Http\Middleware\EnsurePlatformAdministrator;
+use App\Http\Middleware\HandleAppearance;
+use App\Http\Middleware\HandleInertiaRequests;
+use App\Http\Middleware\ResolveTenant;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Middleware\SubstituteBindings;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -12,7 +19,19 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        $middleware->alias([
+            'tenant' => ResolveTenant::class,
+            'module' => EnsureModuleAccess::class,
+            'platform' => EnsurePlatformAdministrator::class,
+        ]);
+        $middleware->prependToPriorityList(SubstituteBindings::class, ResolveTenant::class);
+        $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
+
+        $middleware->web(append: [
+            HandleAppearance::class,
+            HandleInertiaRequests::class,
+            AddLinkHeadersForPreloadedAssets::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

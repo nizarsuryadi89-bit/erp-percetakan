@@ -2,24 +2,29 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
+use App\Models\Tenant;
+use App\Support\TenantContext;
+use Closure;
 use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
 {
-    use WithoutModelEvents;
-
-    /**
-     * Seed the application's database.
-     */
     public function run(): void
     {
-        // User::factory(10)->create();
+        $this->call([ModuleSeeder::class, TenantSeeder::class, BranchSeeder::class, LicenseSeeder::class, TenantModuleSeeder::class, TenantModuleEntitlementSeeder::class]);
+    }
 
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-        ]);
+    protected function eachTenant(Closure $seed): void
+    {
+        $context = app(TenantContext::class);
+        $previous = $context->tenant();
+        try {
+            Tenant::orderBy('id')->each(function (Tenant $tenant) use ($context, $seed): void {
+                $context->set($tenant);
+                $seed($tenant);
+            });
+        } finally {
+            $context->set($previous);
+        }
     }
 }

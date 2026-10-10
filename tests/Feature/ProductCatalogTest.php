@@ -6,7 +6,7 @@ use App\Models\License;
 use App\Models\Product;
 use App\Models\ProductPrice;
 use App\Models\Tenant;
-use App\Models\TenantModule;
+use App\Models\TenantModuleEntitlement;
 use App\Models\User;
 use App\Support\TenantContext;
 use Illuminate\Database\QueryException;
@@ -42,7 +42,10 @@ function catalogCompany(): array
 {
     $owner = User::factory()->create();
     $tenant = app(CreateCompany::class)->handle($owner, ['name' => 'Katalog Uji']);
-    inCatalogCompany($tenant, fn () => License::firstOrFail()->update(['status' => 'active', 'activated_at' => now()]));
+    inCatalogCompany($tenant, function (): void {
+        License::firstOrFail()->update(['status' => 'active', 'activated_at' => now()]);
+        TenantModuleEntitlement::whereHas('module', fn ($query) => $query->where('code', 'POS'))->firstOrFail()->update(['is_granted' => true]);
+    });
 
     return [$owner, $tenant];
 }
@@ -409,7 +412,7 @@ test('rounding happens after multiplication at the nearest rupiah', function ():
 test('hidden transaction module blocks every catalog endpoint', function (): void {
     [$owner, $tenant] = catalogCompany();
     $product = inCatalogCompany($tenant, function (): Product {
-        TenantModule::where('code', 'transaksi')->firstOrFail()->update(['is_enabled' => false]);
+        TenantModuleEntitlement::whereHas('module', fn ($query) => $query->where('code', 'POS'))->firstOrFail()->update(['is_enabled' => false]);
 
         return Product::factory()->create();
     });

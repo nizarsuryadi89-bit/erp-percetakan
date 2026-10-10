@@ -3,21 +3,22 @@
 namespace App\Http\Controllers;
 
 use App\Models\Module;
+use App\Support\ModuleRegistry;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class WorkspaceController extends Controller
 {
-    public function module(Module $module): Response
+    public function module(Module $module, ModuleRegistry $registry): Response
     {
-        return Inertia::render('foundation/workspace', ['code' => $module->code, 'module' => ['name' => $module->name, 'description' => $module->description, 'dependencies' => [], 'steps' => []]]);
+        return Inertia::render('foundation/workspace', ['code' => $module->code, 'module' => $registry->tenantCatalog()[$module->code]]);
     }
 
-    public function show(string $code): Response
+    public function show(string $code, ModuleRegistry $registry): Response
     {
-        $module = config('erp.modules.'.$code);
+        $module = $registry->resolve($code);
         abort_unless($module, 404);
 
-        return Inertia::render('foundation/workspace', ['code' => $code, 'module' => $module]);
+        return $this->module($module, $registry);
     }
 }

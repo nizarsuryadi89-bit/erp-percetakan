@@ -30,10 +30,10 @@ class PlatformController extends Controller
         $context->set($tenant);
         try {
             $license = License::firstOrFail();
-            $entitlements = TenantModuleEntitlement::orderBy('id')->get();
+            $entitlements = TenantModuleEntitlement::with('module')->orderBy('id')->get();
             $expiresOn = $license->expires_at?->setTimezone($tenant->timezone)->format('Y-m-d');
 
-            return Inertia::render('platform/company-modules', ['company' => $tenant, 'modules' => $registry->modules(), 'entitlements' => $entitlements, 'license' => $license, 'expiresOn' => $expiresOn]);
+            return Inertia::render('platform/company-modules', ['company' => $tenant->only(['id', 'uuid', 'name', 'is_active']), 'modules' => $registry->modules(), 'entitlements' => $entitlements, 'license' => $license, 'expiresOn' => $expiresOn, 'moduleExpiries' => $entitlements->mapWithKeys(fn (TenantModuleEntitlement $row): array => [$row->module->code => $row->expires_at?->setTimezone($tenant->timezone)->format('Y-m-d') ?? ''])]);
         } finally {
             $context->set($previous);
         }

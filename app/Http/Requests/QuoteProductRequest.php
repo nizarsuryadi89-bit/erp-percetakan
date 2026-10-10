@@ -8,7 +8,7 @@ class QuoteProductRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->can('transaksi.view') ?? false;
+        return $this->user()?->can('POS.view') ?? false;
     }
 
     /** @return array<string, array<mixed>> */

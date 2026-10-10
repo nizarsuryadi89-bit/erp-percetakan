@@ -61,15 +61,43 @@ return new class extends Migration
                 DB::table('module_dependencies')->insert(['module_id' => $ids[$code], 'dependency_id' => $ids[$dependency]]);
             }
         }
-        /** Preserve access already provisioned under the previous package. New companies receive no grants automatically. */
-        DB::table('tenants')->orderBy('id')->each(function (object $tenant) use ($ids): void {
-            $existing = DB::table('tenant_modules')->where('tenant_id', $tenant->id)->pluck('code')->all();
+        $modulePermissions = array_map(fn (string $code): string => $code.'.view', array_keys($ids));
+        $management = ['perusahaan.manage', 'cabang.manage', 'pengguna.manage', 'modul.manage', 'produk.manage'];
+        foreach ([...$modulePermissions, ...$management] as $name) {
+            DB::table('permissions')->insertOrIgnore(['name' => $name, 'guard_name' => 'web', 'created_at' => now(), 'updated_at' => now()]);
+        }
+        $permissionIds = DB::table('permissions')->where('guard_name', 'web')->pluck('id', 'name');
+        $roles = [
+            'Owner' => [...$modulePermissions, ...$management],
+            'Administrator' => [...$modulePermissions, ...$management],
+            'Kasir' => ['POS.view'],
+            'Operator Produksi' => ['PRODUCTION.view'],
+            'Keuangan' => ['FINANCE.view', 'ANALYTICS.view'],
+            'Read Only' => $modulePermissions,
+        ];
+        DB::table('tenants')->orderBy('id')->each(function (object $tenant) use ($ids, $roles, $permissionIds): void {
+            $legacy = DB::table('tenant_modules')->where('tenant_id', $tenant->id)->pluck('is_enabled', 'code')->map(fn ($enabled): bool => (bool) $enabled)->all();
+            $grants = array_fill_keys(array_keys($ids), false);
             foreach (['POS' => ['transaksi'], 'PRODUCTION' => ['bom', 'routing', 'produksi'], 'FINANCE' => ['keuangan'], 'ANALYTICS' => ['laba_rugi']] as $code => $features) {
-                if (array_intersect($features, $existing)) {
-                    DB::table('tenant_module_entitlements')->insert(['tenant_id' => $tenant->id, 'module_id' => $ids[$code], 'is_granted' => true, 'is_enabled' => true, 'created_at' => now(), 'updated_at' => now()]);
+                $grants[$code] = collect($features)->every(fn (string $feature): bool => $legacy[$feature] ?? false);
+            }
+            $grants['PRODUCTION'] = $grants['PRODUCTION'] && $grants['POS'];
+            $grants['FINANCE'] = $grants['FINANCE'] && $grants['POS'];
+            $grants['ANALYTICS'] = $grants['ANALYTICS'] && $grants['POS'] && $grants['PRODUCTION'] && $grants['FINANCE'];
+            foreach ($ids as $code => $id) {
+                DB::table('tenant_module_entitlements')->insert(['tenant_id' => $tenant->id, 'module_id' => $id, 'is_granted' => $grants[$code], 'is_enabled' => $grants[$code], 'created_at' => now(), 'updated_at' => now()]);
+            }
+            foreach ($roles as $name => $permissions) {
+                $role = DB::table('roles')->where('tenant_id', $tenant->id)->where('name', $name)->where('guard_name', 'web')->first();
+                $roleId = $role?->id ?? DB::table('roles')->insertGetId(['tenant_id' => $tenant->id, 'name' => $name, 'guard_name' => 'web', 'created_at' => now(), 'updated_at' => now()]);
+                foreach ($permissions as $permission) {
+                    DB::table('role_has_permissions')->insertOrIgnore(['role_id' => $roleId, 'permission_id' => $permissionIds[$permission]]);
                 }
             }
+            DB::table('audit_logs')->insert(['tenant_id' => $tenant->id, 'action' => 'modul.legacy_dikonversi', 'metadata' => json_encode(['legacy_enabled' => $legacy, 'canonical_grants' => $grants]), 'created_at' => now(), 'updated_at' => now()]);
         });
+        app('cache')->store(config('permission.cache.store') === 'default' ? null : config('permission.cache.store'))->forget(config('permission.cache.key'));
+
     }
 
     public function down(): void

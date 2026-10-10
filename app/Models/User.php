@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Schema;
 use Laravel\Fortify\Contracts\PasskeyUser;
 use Laravel\Fortify\PasskeyAuthenticatable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
@@ -38,7 +39,8 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
 
     public function isPlatformAdministrator(): bool
     {
-        return PlatformAdministrator::where('user_id', $this->id)->where('is_active', true)->exists();
+        return $this->hasVerifiedEmail() && Schema::hasTable('platform_administrators')
+            && PlatformAdministrator::where('user_id', $this->id)->where('is_active', true)->exists();
     }
 
     public function tenants(): BelongsToMany

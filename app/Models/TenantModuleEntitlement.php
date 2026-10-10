@@ -25,7 +25,12 @@ class TenantModuleEntitlement extends TenantModel
     public function isUsable(): bool
     {
         return $this->is_granted && $this->is_enabled
-            && ($this->starts_at === null || $this->starts_at->lessThanOrEqualTo(now()))
+            && $this->isWithinAccessWindow();
+    }
+
+    public function isWithinAccessWindow(): bool
+    {
+        return ($this->starts_at === null || $this->starts_at->lessThanOrEqualTo(now()))
             && ($this->expires_at === null || $this->expires_at->isFuture());
     }
 }

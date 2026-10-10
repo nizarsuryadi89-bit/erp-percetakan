@@ -20,6 +20,7 @@ export type Workspace = {
     branchId: number | null;
     navigation: NavigationLink[];
     settings: NavigationLink[];
+    platform: NavigationLink[];
     roles: string[];
     switchCompanyUrl: string;
     switchBranchUrl: string;
@@ -46,4 +47,20 @@ export type TenantUser = {
     email: string;
     role: string;
     is_active: boolean;
+};
+
+export type ModuleEntitlement = {
+    code: string;
+    is_granted: boolean;
+    is_enabled: boolean;
+    is_usable: boolean;
+    expires_at: string | null;
+};
+export type PlatformModule = {
+    id: number;
+    code: string;
+    name: string;
+    description: string;
+    is_active: boolean;
+    dependencies: { code: string; name: string }[];
 };

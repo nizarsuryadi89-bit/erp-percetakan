@@ -30,6 +30,15 @@ import type { NavigationLink } from '@/types/erp';
 
 const icons = {
     dashboard: LayoutGrid,
+    POS: ClipboardList,
+    PRODUCTION: Factory,
+    INVENTORY: Layers,
+    FINANCE: Wallet,
+    CRM: Users,
+    HRM: Users,
+    ANALYTICS: ChartNoAxesCombined,
+    AI_ASSISTANT: Settings2,
+    platform: Settings2,
     transaksi: ClipboardList,
     bom: Layers,
     routing: GitBranch,
@@ -63,6 +72,7 @@ export function AppSidebar() {
                 </SidebarMenu>
             </SidebarHeader>
             <SidebarContent>
+                <NavMain items={links(workspace.platform)} />
                 <NavMain items={links(workspace.navigation)} />
                 {workspace.settings.length > 0 && (
                     <SidebarGroup>
@@ -73,7 +83,7 @@ export function AppSidebar() {
             </SidebarContent>
             <SidebarFooter>
                 <div className="px-3 py-2 text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">
-                    Paket ERP Percetakan
+                    ERP Percetakan
                     <span className="mt-1 block">
                         Transaksi · Produksi · Keuangan
                     </span>

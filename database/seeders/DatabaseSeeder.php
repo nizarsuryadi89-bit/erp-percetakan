@@ -11,7 +11,7 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
-        $this->call([ModuleSeeder::class, TenantSeeder::class, BranchSeeder::class, LicenseSeeder::class, TenantModuleSeeder::class, TenantModuleEntitlementSeeder::class]);
+        $this->call([ModuleSeeder::class, TenantSeeder::class, BranchSeeder::class, LicenseSeeder::class, TenantModuleEntitlementSeeder::class]);
     }
 
     protected function eachTenant(Closure $seed): void

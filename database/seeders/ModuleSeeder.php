@@ -10,7 +10,7 @@ class ModuleSeeder extends Seeder
     public function run(): void
     {
         foreach (config('erp.module_registry') as $code => $definition) {
-            Module::firstOrCreate(['code' => $code], collect($definition)->except('dependencies')->all());
+            Module::firstOrCreate(['code' => $code], collect($definition)->except(['dependencies', 'steps'])->all());
         }
         foreach (config('erp.module_registry') as $code => $definition) {
             $module = Module::where('code', $code)->firstOrFail();

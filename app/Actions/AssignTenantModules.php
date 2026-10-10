@@ -17,9 +17,9 @@ use Illuminate\Validation\ValidationException;
 
 class AssignTenantModules
 {
-    public function __construct(private TenantContext $context, private ModuleRegistry $registry) {}
+    public function __construct(private TenantContext $context, private ModuleRegistry $registry, private ProvisionTenantAccess $provision) {}
 
-    /** @param array{module_codes: list<string>, access_status?: string, expires_at?: ?string} $data */
+    /** @param array{module_codes: list<string>, access_status?: string, expires_at?: ?string, module_expiries?: array<string, ?string>} $data */
     public function handle(User $developer, Tenant $tenant, array $data): void
     {
         Gate::forUser($developer)->authorize('platform.manage');
@@ -28,6 +28,7 @@ class AssignTenantModules
         try {
             DB::transaction(function () use ($developer, $tenant, $data): void {
                 Tenant::whereKey($tenant->id)->lockForUpdate()->firstOrFail();
+                $this->provision->handle($tenant);
                 $modules = Module::orderBy('id')->lockForUpdate()->get();
                 $selected = $data['module_codes'];
                 if (array_diff($selected, $modules->where('is_active', true)->pluck('code')->all())) {
@@ -44,6 +45,10 @@ class AssignTenantModules
                 foreach ($modules as $module) {
                     $entitlement = $rows->get($module->id) ?? new TenantModuleEntitlement(['module_id' => $module->id, 'is_enabled' => true]);
                     $entitlement->fill(['is_granted' => in_array($module->code, $selected, true), 'granted_by' => $developer->id]);
+                    if (array_key_exists($module->code, $data['module_expiries'] ?? [])) {
+                        $date = $data['module_expiries'][$module->code];
+                        $entitlement->expires_at = $date ? Carbon::parse($date, $tenant->timezone)->endOfDay()->utc() : null;
+                    }
                     $entitlement->save();
                 }
                 if (array_key_exists('access_status', $data)) {
@@ -52,7 +57,7 @@ class AssignTenantModules
                 if (array_key_exists('expires_at', $data)) {
                     $license->update(['expires_at' => $data['expires_at'] ? Carbon::parse($data['expires_at'], $tenant->timezone)->endOfDay()->utc() : null]);
                 }
-                AuditLog::create(['actor_id' => $developer->id, 'action' => 'platform.modul_ditetapkan', 'metadata' => ['module_codes' => $selected, 'previous_module_ids' => $before, 'access_status' => $license->status, 'expires_at' => $license->expires_at?->toISOString()]]);
+                AuditLog::create(['actor_id' => $developer->id, 'action' => 'platform.modul_ditetapkan', 'metadata' => ['module_codes' => $selected, 'previous_module_ids' => $before, 'access_status' => $license->status, 'expires_at' => $license->expires_at?->toISOString(), 'module_expiries' => $data['module_expiries'] ?? []]]);
             });
         } finally {
             $this->context->set($previous);

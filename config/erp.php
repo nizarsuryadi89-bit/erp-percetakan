@@ -5,7 +5,7 @@ return [
     'license_price' => '0.00',
     'roles' => ['Owner', 'Administrator', 'Kasir', 'Operator Produksi', 'Keuangan', 'Read Only'],
     'module_registry' => [
-        'POS' => ['name' => 'Transaksi / POS', 'description' => 'Order, SPK, kasir, invoice, dan piutang konsumen.', 'feature_codes' => ['transaksi'], 'sort_order' => 0, 'is_active' => true, 'dependencies' => []],
+        'POS' => ['name' => 'Transaksi / POS', 'description' => 'Katalog, harga percetakan otomatis, serta SPK dan ringkasan penjualan dasar.', 'feature_codes' => ['transaksi'], 'steps' => ['Pilih produk dan spesifikasi', 'Hitung harga percetakan', 'SPK dasar dan pembayaran (tahap berikutnya)', 'Ringkasan penjualan dasar (tahap berikutnya)'], 'sort_order' => 0, 'is_active' => true, 'dependencies' => []],
         'PRODUCTION' => ['name' => 'Produksi', 'description' => 'BOM, routing, antrean produksi, finishing, dan QC.', 'feature_codes' => ['bom', 'routing', 'produksi'], 'sort_order' => 1, 'is_active' => true, 'dependencies' => ['POS']],
         'INVENTORY' => ['name' => 'Persediaan', 'description' => 'Bahan, stok, penerimaan, dan pergerakan persediaan.', 'feature_codes' => [], 'sort_order' => 2, 'is_active' => true, 'dependencies' => []],
         'FINANCE' => ['name' => 'Keuangan', 'description' => 'Pembayaran, piutang, pengeluaran, dan rekap keuangan.', 'feature_codes' => ['keuangan'], 'sort_order' => 3, 'is_active' => true, 'dependencies' => ['POS']],

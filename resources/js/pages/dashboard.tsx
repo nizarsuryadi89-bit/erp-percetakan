@@ -12,6 +12,8 @@ import type { Catalog, License } from '@/types/erp';
 
 type Props = {
     license: License;
+    licenseUsable: boolean;
+    accessReady: boolean;
     branchCount: number;
     userCount: number;
     catalog: Catalog;
@@ -19,17 +21,15 @@ type Props = {
 };
 export default function Dashboard({
     license,
+    licenseUsable,
+    accessReady,
     branchCount,
     userCount,
     catalog,
     recentActivity,
 }: Props) {
     const { workspace } = usePage().props;
-    const usable =
-        license.status === 'active' &&
-        license.activated_at !== null &&
-        new Date(license.activated_at) <= new Date() &&
-        (!license.expires_at || new Date(license.expires_at) > new Date());
+    const usable = licenseUsable;
     const modulesUrl = workspace.settings.find(
         (item) => item.code === 'modul',
     )?.href;
@@ -40,6 +40,7 @@ export default function Dashboard({
                 title={workspace.tenant?.name ?? 'Dashboard'}
                 description="Kelola percetakan dari satu tempat. Menu dan urutan kerja mengikuti ERP yang sudah Anda gunakan."
             >
+                {!accessReady && <p role="status" className={panel}>Akses perusahaan sedang disiapkan. Hubungi pengelola.</p>}
                 <section className="grid gap-4 sm:grid-cols-3">
                     {[
                         {
@@ -77,7 +78,7 @@ export default function Dashboard({
                                 {license.package_name}
                             </h2>
                             <p className="mt-1 text-sm text-muted-foreground">
-                                Rp5.000.000 sekali bayar ·{' '}
+                                {Number(license.price) > 0 ? new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(Number(license.price)) : 'Biaya lisensi belum ditetapkan'} ·{' '}
                                 {usable
                                     ? 'Lisensi aktif'
                                     : 'Menunggu aktivasi lisensi'}

@@ -14,7 +14,7 @@ export default function ModuleWorkspace({
         <>
             <Head title={module.name} />
             <ErpPage title={module.name} description={module.description}>
-                {code === 'transaksi' && (
+                {code === 'POS' && (
                     <section className={panel}>
                         <h2 className="font-semibold">Produk & Harga</h2>
                         <p className="mt-2 text-sm text-muted-foreground">

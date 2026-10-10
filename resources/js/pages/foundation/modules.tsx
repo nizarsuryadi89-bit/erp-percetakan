@@ -2,7 +2,7 @@ import { Head, router } from '@inertiajs/react';
 import { ErpPage, panel } from '@/components/erp-page';
 import { Button } from '@/components/ui/button';
 import { update } from '@/routes/modules';
-import type { Catalog, License } from '@/types/erp';
+import type { Catalog, License, ModuleEntitlement } from '@/types/erp';
 
 export default function Modules({
     license,
@@ -11,7 +11,7 @@ export default function Modules({
 }: {
     license: License;
     catalog: Catalog;
-    entitlements: { code: string; is_enabled: boolean }[];
+    entitlements: ModuleEntitlement[];
 }) {
     return (
         <>
@@ -23,7 +23,7 @@ export default function Modules({
                 <section className={panel}>
                     <h2 className="font-semibold">{license.package_name}</h2>
                     <div className="mt-3 flex flex-wrap gap-6 text-sm">
-                        <span>Rp5.000.000 sekali bayar</span>
+                        <span>{Number(license.price) > 0 ? new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(Number(license.price)) : 'Biaya lisensi belum ditetapkan'}</span>
                         <span>
                             Status:{' '}
                             <strong>
@@ -51,9 +51,9 @@ export default function Modules({
                 </section>
                 <section className="grid gap-4 md:grid-cols-2">
                     {Object.entries(catalog).map(([code, module]) => {
-                        const enabled =
-                            entitlements.find((item) => item.code === code)
-                                ?.is_enabled ?? false;
+                        const entitlement = entitlements.find((item) => item.code === code);
+                        const granted = entitlement?.is_granted ?? false;
+                        const enabled = granted && (entitlement?.is_enabled ?? false);
                         return (
                             <article key={code} className={panel}>
                                 <div className="flex items-center justify-between gap-3">
@@ -63,9 +63,7 @@ export default function Modules({
                                     <span
                                         className={`rounded-full px-2 py-1 text-xs ${enabled ? 'bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-200' : 'bg-muted text-muted-foreground'}`}
                                     >
-                                        {enabled
-                                            ? 'Diaktifkan'
-                                            : 'Disembunyikan'}
+                                        {!granted ? 'Belum diberikan developer' : !enabled ? 'Disembunyikan' : entitlement?.is_usable ? 'Diaktifkan' : 'Di luar masa akses'}
                                     </span>
                                 </div>
                                 <p className="mt-3 text-sm leading-6 text-muted-foreground">
@@ -73,12 +71,13 @@ export default function Modules({
                                 </p>
                                 <p className="mt-3 text-xs text-muted-foreground">
                                     {module.dependencies.length
-                                        ? `Memerlukan: ${module.dependencies.map((dependency) => catalog[dependency].name).join(', ')}`
-                                        : 'Termasuk paket dasar'}
+                                        ? `Memerlukan: ${module.dependencies.map((dependency) => catalog[dependency]?.name ?? dependency).join(', ')}`
+                                        : 'Tidak memerlukan modul lain'}
                                 </p>
                                 <Button
                                     className="mt-4"
                                     variant="outline"
+                                    disabled={!granted}
                                     onClick={() => {
                                         if (
                                             window.confirm(

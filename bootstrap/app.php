@@ -24,7 +24,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'module' => EnsureModuleAccess::class,
             'platform' => EnsurePlatformAdministrator::class,
         ]);
-        $middleware->prependToPriorityList(SubstituteBindings::class, ResolveTenant::class);
+        $middleware->prependToPriorityList(SubstituteBindings::class, EnsureModuleAccess::class);
+        $middleware->prependToPriorityList(EnsureModuleAccess::class, ResolveTenant::class);
         $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
 
         $middleware->web(append: [

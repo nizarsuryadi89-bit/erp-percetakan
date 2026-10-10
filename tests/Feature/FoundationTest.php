@@ -3,8 +3,9 @@
 use App\Actions\CreateCompany;
 use App\Models\Branch;
 use App\Models\License;
+use App\Models\Module;
 use App\Models\Tenant;
-use App\Models\TenantModule;
+use App\Models\TenantModuleEntitlement;
 use App\Models\User;
 use App\Support\TenantContext;
 use Database\Seeders\DatabaseSeeder;
@@ -47,8 +48,14 @@ function withinTestCompany(Tenant $tenant, Closure $action): mixed
     }
 }
 
+function grantTestModules(Tenant $tenant): void
+{
+    withinTestCompany($tenant, fn () => TenantModuleEntitlement::whereHas('module', fn ($query) => $query->whereIn('code', ['POS', 'PRODUCTION', 'FINANCE', 'ANALYTICS']))->update(['is_granted' => true, 'is_enabled' => true]));
+}
+
 function activateTestLicense(Tenant $tenant): void
 {
+    grantTestModules($tenant);
     withinTestCompany($tenant, fn () => License::firstOrFail()->update(['status' => 'active', 'activated_at' => now()]));
 }
 
@@ -115,7 +122,7 @@ test('users without a company are directed to company registration', function ()
     $this->actingAs($user)->get(route('dashboard'))->assertRedirect(route('companies.create'));
 });
 
-test('company registration creates its owner branch pending license and six modules', function (): void {
+test('company registration creates owner branch pending license and ungranted canonical modules', function (): void {
     $user = User::factory()->create();
 
     $this->actingAs($user)->post(route('companies.store'), ['name' => 'Cetak Maju', 'phone' => '0812345678', 'address' => 'Bandung', 'is_active' => false, 'price' => 0, 'status' => 'active'])->assertRedirect(route('dashboard'));
@@ -123,8 +130,9 @@ test('company registration creates its owner branch pending license and six modu
     $tenant = Tenant::where('name', 'Cetak Maju')->firstOrFail();
     $this->assertDatabaseHas('tenant_user', ['tenant_id' => $tenant->id, 'user_id' => $user->id, 'is_active' => true]);
     $this->assertDatabaseHas('branches', ['tenant_id' => $tenant->id, 'code' => 'UTAMA']);
-    $this->assertDatabaseHas('licenses', ['tenant_id' => $tenant->id, 'status' => 'pending', 'price' => 5000000]);
-    $this->assertDatabaseCount('tenant_modules', 6);
+    $this->assertDatabaseHas('licenses', ['tenant_id' => $tenant->id, 'status' => 'pending', 'price' => config('erp.license_price')]);
+    $this->assertDatabaseCount('tenant_modules', 0);
+    $this->assertDatabaseCount('tenant_module_entitlements', 8);
     expect($tenant->uuid)->toBeUuid();
     expect($tenant->is_active)->toBeTrue();
     withinTestCompany($tenant, fn () => expect($user->getRoleNames()->all())->toBe(['Owner']));
@@ -246,9 +254,10 @@ test('active licenses allow authorized modules while expired support does not bl
     $this->freezeTime();
     $user = User::factory()->create();
     $tenant = createTestCompany($user);
+    grantTestModules($tenant);
     withinTestCompany($tenant, fn () => License::firstOrFail()->update(['status' => 'active', 'activated_at' => now()->subDay(), 'support_ends_at' => now()->subDay()]));
 
-    $this->actingAs($user)->withSession(['tenant_id' => $tenant->id])->get(route('transaksi.index'))->assertOk()->assertInertia(fn (Assert $page) => $page->component('foundation/workspace')->where('module.name', 'Transaksi'));
+    $this->actingAs($user)->withSession(['tenant_id' => $tenant->id])->get(route('transaksi.index'))->assertOk()->assertInertia(fn (Assert $page) => $page->component('foundation/workspace')->where('module.name', 'Transaksi / POS'));
 });
 
 test('expired suspended or future licenses cannot authorize modules', function (string $state): void {
@@ -266,7 +275,7 @@ test('disabled modules are hidden and rejected by direct access', function (): v
     $user = User::factory()->create();
     $tenant = createTestCompany($user);
     activateTestLicense($tenant);
-    withinTestCompany($tenant, fn () => TenantModule::where('code', 'produksi')->firstOrFail()->update(['is_enabled' => false]));
+    withinTestCompany($tenant, fn () => TenantModuleEntitlement::whereHas('module', fn ($query) => $query->where('code', 'PRODUCTION'))->firstOrFail()->update(['is_enabled' => false]));
 
     $this->actingAs($user)->withSession(['tenant_id' => $tenant->id])->get(route('produksi.index'))->assertForbidden();
 });
@@ -275,16 +284,16 @@ test('dashboard navigation omits disabled modules', function (): void {
     $user = User::factory()->create();
     $tenant = createTestCompany($user);
     activateTestLicense($tenant);
-    withinTestCompany($tenant, fn () => TenantModule::where('code', 'produksi')->firstOrFail()->update(['is_enabled' => false]));
+    withinTestCompany($tenant, fn () => TenantModuleEntitlement::whereHas('module', fn ($query) => $query->where('code', 'PRODUCTION'))->firstOrFail()->update(['is_enabled' => false]));
 
-    $this->actingAs($user)->withSession(['tenant_id' => $tenant->id])->get(route('dashboard'))->assertOk()->assertInertia(fn (Assert $page) => $page->has('workspace.navigation', 6)->where('workspace.navigation.0.title', 'Dashboard')->where('workspace.navigation.4.code', 'keuangan'));
+    $this->actingAs($user)->withSession(['tenant_id' => $tenant->id])->get(route('dashboard'))->assertOk()->assertInertia(fn (Assert $page) => $page->has('workspace.navigation', 3)->where('workspace.navigation.0.title', 'Dashboard')->where('workspace.navigation.2.code', 'FINANCE'));
 });
 
 test('an active module cannot bypass a missing supporting module', function (): void {
     $user = User::factory()->create();
     $tenant = createTestCompany($user);
     activateTestLicense($tenant);
-    withinTestCompany($tenant, fn () => TenantModule::where('code', 'bom')->firstOrFail()->update(['is_enabled' => false]));
+    withinTestCompany($tenant, fn () => TenantModuleEntitlement::whereHas('module', fn ($query) => $query->where('code', 'POS'))->firstOrFail()->update(['is_enabled' => false]));
 
     $this->actingAs($user)->withSession(['tenant_id' => $tenant->id])->get(route('produksi.index'))->assertForbidden();
 });
@@ -292,31 +301,35 @@ test('an active module cannot bypass a missing supporting module', function (): 
 test('module management prevents disabling a required dependency', function (): void {
     $user = User::factory()->create();
     $tenant = createTestCompany($user);
+    grantTestModules($tenant);
 
-    $this->actingAs($user)->withSession(['tenant_id' => $tenant->id])->patch(route('modules.update', 'bom'), ['is_enabled' => false])->assertSessionHasErrors(['is_enabled' => 'Nonaktifkan Produksi terlebih dahulu.']);
+    $this->actingAs($user)->withSession(['tenant_id' => $tenant->id])->patch(route('modules.update', 'bom'), ['is_enabled' => false])->assertSessionHasErrors(['is_enabled' => 'Nonaktifkan Analitik / Laba Rugi terlebih dahulu.']);
 
-    $this->assertDatabaseHas('tenant_modules', ['tenant_id' => $tenant->id, 'code' => 'bom', 'is_enabled' => true]);
+    $this->assertDatabaseHas('tenant_module_entitlements', ['tenant_id' => $tenant->id, 'module_id' => Module::where('code', 'PRODUCTION')->value('id'), 'is_enabled' => true]);
 });
 
 test('module management permits hiding a leaf module without deleting its entitlement', function (): void {
     $user = User::factory()->create();
     $tenant = createTestCompany($user);
+    grantTestModules($tenant);
 
-    $this->actingAs($user)->withSession(['tenant_id' => $tenant->id])->patch(route('modules.update', 'produksi'), ['is_enabled' => false])->assertSessionHasNoErrors();
+    $this->actingAs($user)->withSession(['tenant_id' => $tenant->id])->patch(route('modules.update', 'laba_rugi'), ['is_enabled' => false])->assertSessionHasNoErrors();
 
-    $this->assertDatabaseHas('tenant_modules', ['tenant_id' => $tenant->id, 'code' => 'produksi', 'is_enabled' => false]);
-    $this->assertDatabaseCount('tenant_modules', 6);
+    $this->assertDatabaseHas('tenant_module_entitlements', ['tenant_id' => $tenant->id, 'module_id' => Module::where('code', 'ANALYTICS')->value('id'), 'is_granted' => true, 'is_enabled' => false]);
+    $this->assertDatabaseCount('tenant_modules', 0);
+    $this->assertDatabaseCount('tenant_module_entitlements', 8);
     $this->assertDatabaseHas('audit_logs', ['tenant_id' => $tenant->id, 'action' => 'modul.diperbarui']);
 });
 
 test('module management cannot activate a module whose dependency is missing', function (): void {
     $user = User::factory()->create();
     $tenant = createTestCompany($user);
-    withinTestCompany($tenant, fn () => TenantModule::whereIn('code', ['bom', 'produksi'])->get()->each(fn (TenantModule $module) => $module->update(['is_enabled' => false])));
+    grantTestModules($tenant);
+    withinTestCompany($tenant, fn () => TenantModuleEntitlement::whereHas('module', fn ($query) => $query->whereIn('code', ['POS', 'PRODUCTION']))->get()->each(fn (TenantModuleEntitlement $module) => $module->update(['is_enabled' => false])));
 
-    $this->actingAs($user)->withSession(['tenant_id' => $tenant->id])->patch(route('modules.update', 'produksi'), ['is_enabled' => true])->assertSessionHasErrors(['is_enabled' => 'Aktifkan BOM terlebih dahulu.']);
+    $this->actingAs($user)->withSession(['tenant_id' => $tenant->id])->patch(route('modules.update', 'produksi'), ['is_enabled' => true])->assertSessionHasErrors(['is_enabled' => 'Aktifkan modul pendukung POS terlebih dahulu.']);
 
-    $this->assertDatabaseHas('tenant_modules', ['tenant_id' => $tenant->id, 'code' => 'produksi', 'is_enabled' => false]);
+    $this->assertDatabaseHas('tenant_module_entitlements', ['tenant_id' => $tenant->id, 'module_id' => Module::where('code', 'PRODUCTION')->value('id'), 'is_enabled' => false]);
 });
 
 test('cashiers operators finance and read only users cannot manage branches', function (string $role): void {
@@ -457,17 +470,17 @@ test('role permissions match familiar ERP responsibilities', function (string $r
     $tenant->users()->attach($user, ['is_active' => true]);
     withinTestCompany($tenant, function () use ($user, $role, $allowed): void {
         $user->assignRole($role);
-        foreach (['transaksi.view', 'bom.view', 'routing.view', 'produksi.view', 'keuangan.view', 'laba_rugi.view', 'perusahaan.manage', 'cabang.manage', 'pengguna.manage', 'modul.manage'] as $ability) {
+        foreach (['POS.view', 'PRODUCTION.view', 'INVENTORY.view', 'FINANCE.view', 'CRM.view', 'HRM.view', 'ANALYTICS.view', 'AI_ASSISTANT.view', 'perusahaan.manage', 'cabang.manage', 'pengguna.manage', 'modul.manage', 'produk.manage'] as $ability) {
             expect($user->can($ability))->toBe(in_array($ability, $allowed, true));
         }
     });
 })->with([
-    ['Owner', ['transaksi.view', 'bom.view', 'routing.view', 'produksi.view', 'keuangan.view', 'laba_rugi.view', 'perusahaan.manage', 'cabang.manage', 'pengguna.manage', 'modul.manage']],
-    ['Administrator', ['transaksi.view', 'bom.view', 'routing.view', 'produksi.view', 'keuangan.view', 'laba_rugi.view', 'perusahaan.manage', 'cabang.manage', 'pengguna.manage', 'modul.manage']],
-    ['Kasir', ['transaksi.view']],
-    ['Operator Produksi', ['produksi.view', 'bom.view', 'routing.view']],
-    ['Keuangan', ['keuangan.view', 'laba_rugi.view']],
-    ['Read Only', ['transaksi.view', 'bom.view', 'routing.view', 'produksi.view', 'keuangan.view', 'laba_rugi.view']],
+    ['Owner', ['POS.view', 'PRODUCTION.view', 'INVENTORY.view', 'FINANCE.view', 'CRM.view', 'HRM.view', 'ANALYTICS.view', 'AI_ASSISTANT.view', 'perusahaan.manage', 'cabang.manage', 'pengguna.manage', 'modul.manage', 'produk.manage']],
+    ['Administrator', ['POS.view', 'PRODUCTION.view', 'INVENTORY.view', 'FINANCE.view', 'CRM.view', 'HRM.view', 'ANALYTICS.view', 'AI_ASSISTANT.view', 'perusahaan.manage', 'cabang.manage', 'pengguna.manage', 'modul.manage', 'produk.manage']],
+    ['Kasir', ['POS.view']],
+    ['Operator Produksi', ['PRODUCTION.view']],
+    ['Keuangan', ['FINANCE.view', 'ANALYTICS.view']],
+    ['Read Only', ['POS.view', 'PRODUCTION.view', 'INVENTORY.view', 'FINANCE.view', 'CRM.view', 'HRM.view', 'ANALYTICS.view', 'AI_ASSISTANT.view']],
 ]);
 
 test('database constraints refuse roles belonging to a different company', function (): void {
@@ -484,12 +497,13 @@ test('database constraints refuse roles belonging to a different company', funct
 test('seeders preserve active licenses and hidden module settings when run again', function (): void {
     $tenant = createTestCompany(User::factory()->create());
     activateTestLicense($tenant);
-    withinTestCompany($tenant, fn () => TenantModule::where('code', 'produksi')->firstOrFail()->update(['is_enabled' => false]));
+    withinTestCompany($tenant, fn () => TenantModuleEntitlement::whereHas('module', fn ($query) => $query->where('code', 'PRODUCTION'))->firstOrFail()->update(['is_enabled' => false]));
 
     $this->seed(DatabaseSeeder::class);
 
     $this->assertDatabaseHas('licenses', ['tenant_id' => $tenant->id, 'status' => 'active']);
-    $this->assertDatabaseHas('tenant_modules', ['tenant_id' => $tenant->id, 'code' => 'produksi', 'is_enabled' => false]);
+    $this->assertDatabaseHas('tenant_module_entitlements', ['tenant_id' => $tenant->id, 'module_id' => Module::where('code', 'PRODUCTION')->value('id'), 'is_enabled' => false]);
     $this->assertDatabaseCount('branches', 1);
-    $this->assertDatabaseCount('tenant_modules', 6);
+    $this->assertDatabaseCount('tenant_modules', 0);
+    $this->assertDatabaseCount('tenant_module_entitlements', 8);
 });

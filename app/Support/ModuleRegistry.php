@@ -5,13 +5,29 @@ namespace App\Support;
 use App\Models\Module;
 use App\Models\TenantModuleEntitlement;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class ModuleRegistry
 {
+    public function isReady(): bool
+    {
+        foreach (['modules', 'module_dependencies', 'tenant_module_entitlements', 'platform_administrators'] as $table) {
+            if (! Schema::hasTable($table)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     /** @return Collection<int, Module> */
     public function modules(): Collection
     {
+        if (! $this->isReady()) {
+            return new Collection;
+        }
+
         return Module::with('dependencies')->orderBy('sort_order')->orderBy('id')->get();
     }
 
@@ -48,6 +64,9 @@ class ModuleRegistry
     /** @return list<string> */
     public function availableCodes(): array
     {
+        if (! $this->isReady()) {
+            return [];
+        }
         $modules = $this->modules();
         $active = $modules->where('is_active', true)->pluck('code')->all();
         $grants = TenantModuleEntitlement::with('module')->get()->filter(fn (TenantModuleEntitlement $entitlement): bool => $entitlement->isUsable())->map(fn (TenantModuleEntitlement $entitlement): string => $entitlement->module->code)->all();
@@ -65,10 +84,9 @@ class ModuleRegistry
     /** @return array<string, array{name: string, description: string, dependencies: list<string>, steps: list<string>}> */
     public function tenantCatalog(): array
     {
-        $ids = TenantModuleEntitlement::where('is_granted', true)->pluck('module_id')->all();
         $catalog = [];
-        foreach ($this->modules()->whereIn('id', $ids) as $module) {
-            $catalog[$module->code] = ['name' => $module->name, 'description' => $module->description, 'dependencies' => $module->dependencies->pluck('code')->all(), 'steps' => []];
+        foreach ($this->modules() as $module) {
+            $catalog[$module->code] = ['name' => $module->name, 'description' => $module->description, 'dependencies' => $module->dependencies->pluck('code')->all(), 'steps' => config('erp.module_registry.'.$module->code.'.steps', [])];
         }
 
         return $catalog;

@@ -3,8 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Models\Branch;
-use App\Models\License;
-use App\Models\TenantModule;
+use App\Support\ModuleAccess;
 use App\Support\TenantContext;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
@@ -13,7 +12,7 @@ class HandleInertiaRequests extends Middleware
 {
     protected $rootView = 'app';
 
-    public function __construct(private TenantContext $context) {}
+    public function __construct(private TenantContext $context, private ModuleAccess $access) {}
 
     /** @return array<string, mixed> */
     public function share(Request $request): array
@@ -41,13 +40,10 @@ class HandleInertiaRequests extends Middleware
             $request->session()->put('branch_id', $branchId);
         }
         $navigation = [['title' => 'Dashboard', 'href' => route('dashboard'), 'code' => 'dashboard']];
-        $modules = $tenant ? TenantModule::where('is_enabled', true)->pluck('code')->all() : [];
-        $licensed = $tenant && License::first()?->isUsable();
-        if ($licensed) {
-            foreach (config('erp.modules') as $code => $module) {
-                if (in_array($code, $modules, true) && ! array_diff($module['dependencies'], $modules) && $user->can($code.'.view')) {
-                    $navigation[] = ['title' => $module['name'], 'href' => route($code.'.index'), 'code' => $code];
-                }
+        if ($tenant) {
+            foreach ($this->access->codes($user) as $code) {
+                $definition = config('erp.module_registry.'.$code);
+                $navigation[] = ['title' => $definition['name'], 'href' => route('module-workspace.show', ['module' => $code]), 'code' => $code];
             }
         }
         $settings = [];
@@ -57,7 +53,9 @@ class HandleInertiaRequests extends Middleware
             }
         }
 
-        return ['tenant' => $tenant?->only(['id', 'uuid', 'name']), 'companies' => $companies, 'branches' => $branches, 'branchId' => $branchId, 'navigation' => $navigation, 'settings' => $settings,
+        $platform = $user?->isPlatformAdministrator() ? [['title' => 'Panel Developer', 'href' => route('platform.index'), 'code' => 'platform']] : [];
+
+        return ['tenant' => $tenant?->only(['id', 'uuid', 'name']), 'companies' => $companies, 'branches' => $branches, 'branchId' => $branchId, 'navigation' => $navigation, 'settings' => $settings, 'platform' => $platform,
             'switchCompanyUrl' => route('companies.switch'), 'switchBranchUrl' => route('branches.switch'), 'createCompanyUrl' => route('companies.create'),
             'roles' => $tenant ? $user->getRoleNames() : []];
     }

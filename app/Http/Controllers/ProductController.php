@@ -5,10 +5,12 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreProductRequest;
 use App\Models\AuditLog;
 use App\Models\Product;
+use App\Models\ProductQuote;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -37,7 +39,11 @@ class ProductController extends Controller
             $prices->each->makeVisible('hpp');
         }
 
-        return Inertia::render('products/show', ['product' => $product, 'prices' => $prices, 'canManage' => $canManage, 'quote' => ($request->session()->get('price_quote.product_id') === $product->id ? $request->session()->get('price_quote') : null)]);
+        $savedQuotes = Schema::hasTable('product_quotes')
+            ? ProductQuote::where('product_id', $product->id)->orderByDesc('id')->limit(10)->get()->map(fn (ProductQuote $quote): array => ['uuid' => $quote->uuid, 'quoted_at' => $quote->created_at->toISOString(), 'subtotal' => $quote->snapshot['subtotal'], 'qty' => $quote->snapshot['qty']])
+            : collect();
+
+        return Inertia::render('products/show', ['product' => $product, 'prices' => $prices, 'canManage' => $canManage, 'savedQuotes' => $savedQuotes, 'quote' => ($request->session()->get('price_quote.version') === 2 && $request->session()->get('price_quote.product_id') === $product->id ? $request->session()->get('price_quote') : null)]);
     }
 
     public function store(StoreProductRequest $request): RedirectResponse

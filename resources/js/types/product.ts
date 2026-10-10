@@ -28,6 +28,16 @@ export type ProductPrice = {
     is_active: boolean;
 };
 export type PriceQuote = {
+    uuid: string;
+    quoted_at: string;
+    product_name: string;
+    input_length: string;
+    input_width: string;
+    billing_unit: string;
+    tier_basis: 'quantity' | 'billable';
+    lookup_qty: string;
+    qty_min: string;
+    qty_max: string | null;
     product_id: number;
     detail_product: string;
     qty: string;
@@ -69,6 +79,7 @@ export function rupiah(value: string): string {
     return new Intl.NumberFormat('id-ID', {
         style: 'currency',
         currency: 'IDR',
-        maximumFractionDigits: 0,
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 2,
     }).format(Number(value));
 }

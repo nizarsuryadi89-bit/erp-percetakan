@@ -17,7 +17,7 @@ class CalculateProductPrice
 
     /**
      * @param  array{qty: string|int, length?: string|int|null, width?: string|int|null, variant?: string|null, machine?: string|null, print_side?: string|null, finishing?: string|null}  $input
-     * @return array{version: int, product_id: int, product_name: string, price_id: int, detail_product: string, unit_name: string, pricing_basis: string, dimension_unit: string, qty: string, length: string, width: string, billable_qty: string, pricing_qty: string, unit_price: string, minimum_charge: string, minimum_applied: bool, subtotal: string, specifications: array<string, string>, price_updated_at: string}
+     * @return array{version: int, pricing_rule: string, price_revision: string, product_id: int, product_name: string, price_id: int, detail_product: string, unit_name: string, billing_unit: string, pricing_basis: string, tier_basis: string, dimension_unit: string, qty: string, input_length: string, input_width: string, length: string, width: string, billable_qty: string, pricing_qty: string, lookup_qty: string, qty_min: string, qty_max: ?string, unit_price: string, minimum_charge: string, minimum_applied: bool, rounding_mode: string, subtotal: string, specifications: array<string, string>, price_updated_at: string}
      */
     public function handle(Product $product, array $input): array
     {
@@ -30,6 +30,8 @@ class CalculateProductPrice
         $qty = BigDecimal::of((string) $input['qty']);
         $length = BigDecimal::of((string) ($input['length'] ?? '0'));
         $width = BigDecimal::of((string) ($input['width'] ?? '0'));
+        $inputLength = (string) $length;
+        $inputWidth = (string) $width;
         if ($qty->isLessThanOrEqualTo(0) || $length->isLessThan(0) || $width->isLessThan(0)) {
             throw ValidationException::withMessages(['qty' => 'Jumlah harus positif dan ukuran tidak boleh negatif.']);
         }
@@ -60,8 +62,12 @@ class CalculateProductPrice
         $query->where('qty_min', '<=', (string) $lookupQty)->where(function (Builder $query) use ($lookupQty): void {
             $query->whereNull('qty_max')->orWhere('qty_max', '>=', (string) $lookupQty);
         });
+        $matches = $query->orderByDesc('qty_min')->orderBy('id')->limit(2)->get();
+        if ($matches->count() > 1) {
+            throw ValidationException::withMessages(['price' => 'Lebih dari satu harga aktif cocok. Perbaiki rentang harga sebelum menghitung.']);
+        }
         /** @var ProductPrice|null $price */
-        $price = $query->orderByDesc('qty_min')->orderBy('id')->first();
+        $price = $matches->first();
         if (! $price) {
             throw ValidationException::withMessages(['price' => 'Harga belum dikonfigurasi untuk spesifikasi dan jumlah ini.']);
         }
@@ -76,14 +82,30 @@ class CalculateProductPrice
         }
 
         return [
-            'version' => 1, 'product_id' => $product->id, 'product_name' => $product->name,
+            'version' => 2, 'pricing_rule' => 'catalog-v1', 'price_revision' => $this->revision($product, $price),
+            'product_id' => $product->id, 'product_name' => $product->name,
             'price_id' => $price->id, 'detail_product' => $price->detail_product, 'unit_name' => $product->unit_name,
+            'billing_unit' => match ($product->pricing_basis) {
+                'area' => 'm²', 'length' => 'm', default => $product->unit_name
+            },
             'pricing_basis' => $product->pricing_basis, 'dimension_unit' => $product->dimension_unit,
+            'tier_basis' => $product->tier_basis, 'lookup_qty' => (string) $lookupQty,
+            'qty_min' => $price->qty_min, 'qty_max' => $price->qty_max,
+            'input_length' => $inputLength, 'input_width' => $inputWidth,
             'qty' => (string) $qty, 'length' => (string) $length, 'width' => (string) $width,
             'billable_qty' => (string) $billable, 'pricing_qty' => (string) $pricingQty,
             'unit_price' => $price->unit_price, 'minimum_charge' => $price->minimum_charge,
-            'minimum_applied' => $minimumApplied, 'subtotal' => (string) $subtotal,
+            'minimum_applied' => $minimumApplied, 'rounding_mode' => 'half_up_rupiah', 'subtotal' => (string) $subtotal,
             'specifications' => $specifications, 'price_updated_at' => $price->updated_at->toISOString(),
         ];
+    }
+
+    private function revision(Product $product, ProductPrice $price): string
+    {
+        /** HPP is deliberately excluded from the public fingerprint. */
+        return hash('sha256', json_encode([
+            $product->only(['id', 'code', 'name', 'unit_name', 'pricing_basis', 'tier_basis', 'dimension_unit', 'minimum_length', 'minimum_width']),
+            $price->only(['id', 'detail_product', 'variant', 'machine', 'print_side', 'finishing', 'qty_min', 'qty_max', 'unit_price', 'minimum_charge']),
+        ], JSON_THROW_ON_ERROR));
     }
 }

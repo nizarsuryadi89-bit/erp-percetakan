@@ -5,8 +5,8 @@ Tanggal: 10 Oktober 2026. Acuan: [Issue #1](https://github.com/nizarsuryadi89-bi
 Implementasi dan verifikasi STEP 4 selesai pada branch `step-4/saas-module-foundation`. Database pengembangan belum dimigrasikan. STEP 5 belum dimulai.
 
 - Baseline: `9f09918c0994827fdc810cb1dcdca24c288abd21` (`main`).
-- Commit implementasi: akan dicatat setelah commit dibuat.
-- Pull Request: akan dicatat setelah PR dibuat; tidak di-merge.
+- Commit implementasi: [`0072e2906caa82f9d29ba31df848d2529ce9fd8c`](https://github.com/nizarsuryadi89-bit/erp-percetakan/commit/0072e2906caa82f9d29ba31df848d2529ce9fd8c).
+- Pull Request: [#2 — STEP 4: satukan akses modul SaaS dan lengkapi panel platform](https://github.com/nizarsuryadi89-bit/erp-percetakan/pull/2), berstatus open; tidak di-merge. Commit dokumentasi setelah implementasi hanya melengkapi tautan ini.
 - Worktree implementasi: `/private/tmp/erp-percetakan-step4-20261010`.
 - Proyek utama `/Volumes/zarnizar/herd_laravel/erp_percetakan` tetap pada baseline `main`, bersih saat pemeriksaan akhir sebelum commit.
 
